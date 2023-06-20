@@ -24,7 +24,8 @@ class MdocCborIssuer:
         self,
         data: dict,
         devicekeyinfo: Union[dict, CoseKey],
-        doctype: str
+        doctype: str,
+        cert_path: str = None
     ):
         """
         create a new mdoc with signed mso
@@ -36,7 +37,8 @@ class MdocCborIssuer:
 
         msoi = MsoIssuer(
             data=data,
-            private_key=self.private_key
+            private_key=self.private_key,
+            cert_path=cert_path
         )
 
         mso = msoi.sign()
