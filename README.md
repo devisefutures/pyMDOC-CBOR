@@ -34,7 +34,7 @@ pip install pymdlmdoc
 or
 
 ````
-pip install git+https://github.com/peppelinux/pyMDL-MDOC.git
+pip install git+https://github.com/devisefutures/pyMDOC-CBOR.git@cert_arg
 ````
 
 ## Usage
@@ -71,6 +71,7 @@ mdoc = mdoci.new(
     doctype="eu.europa.ec.eudiw.pid.1",
     data=PID_DATA,
     devicekeyinfo=PKEY  # TODO
+    cert_path="/path/"
 )
 
 mdoc

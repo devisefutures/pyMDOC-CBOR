@@ -16,6 +16,9 @@ from pymdoccbor.exceptions import (
 from pymdoccbor import settings
 from pymdoccbor.x509 import MsoX509Fabric
 from pymdoccbor.tools import shuffle_dict
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+
 
 
 class MsoIssuer(MsoX509Fabric):
@@ -27,6 +30,7 @@ class MsoIssuer(MsoX509Fabric):
         self,
         data: dict,
         private_key: Union[dict, CoseKey],
+        cert_path: str,
         digest_alg: str = settings.PYMDOC_HASHALG
     ):
 
@@ -49,6 +53,7 @@ class MsoIssuer(MsoX509Fabric):
 
         self.data: dict = data
         self.hash_map: dict = {}
+        self.cert_path=cert_path
         self.disclosure_map: dict = {}
         self.digest_alg: str = digest_alg
 
@@ -120,14 +125,26 @@ class MsoIssuer(MsoX509Fabric):
                 'validUntil': cbor2.dumps(cbor2.CBORTag(0, self.format_datetime_repr(exp)))
             }
         }
+
+        if(self.cert_path):
         
-        _cert = settings.X509_DER_CERT or self.selfsigned_x509cert()
+            # Load the DER certificate file
+            with open(self.cert_path, "rb") as file:
+                certificate = file.read()
+            
+            cert = x509.load_der_x509_certificate(certificate)
+
+            _cert = cert.public_bytes(getattr(serialization.Encoding, "DER"))
+        else:
+
+            _cert = self.selfsigned_x509cert()
+
         
         mso = Sign1Message(
             phdr={
                 Algorithm: self.private_key.alg,
                 KID: self.private_key.kid,
-                33: self.selfsigned_x509cert()
+                33: _cert
             },
             # TODO: x509 (cbor2.CBORTag(33)) and federation trust_chain support (cbor2.CBORTag(27?)) here
             # 33 means x509chain standing to rfc9360
