@@ -43,6 +43,6 @@ setup(
     install_requires=[
         'cbor2>=5.4.0,<5.5.0',
         'cwt>=2.3.0,<2.4',
-        "pyMDOC-CBOR @ git+https://github.com/devisefutures/pycose.git@hsm"
+        "pycose @ git+https://github.com/devisefutures/pycose.git@hsm"
     ],
 )
