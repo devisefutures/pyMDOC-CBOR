@@ -57,7 +57,7 @@ class MdocCborIssuer:
                             ]
                             for ns, dgst in msoi.disclosure_map.items()
                         },
-                        "issuerAuth": mso.encode()
+                        "issuerAuth": mso.encode(hsm=True,key_label="brainppol2", user_pin="1234", lib_path="/etc/utimaco/libcs2_pkcs11.so",slot_id=3)
                     },
                     'deviceSigned': {
                         # TODO
