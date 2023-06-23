@@ -12,13 +12,18 @@ logger = logging.getLogger('pymdoccbor')
 
 class MdocCborIssuer:
 
-    def __init__(self, private_key: Union[dict, CoseKey] = {}):
+    def __init__(self,key_label :str = None, user_pin :str = None, lib_path :str = None, slot_id :int = None, hsm : bool =False, private_key: Union[dict, CoseKey] = {}):
         self.version: str = '1.0'
         self.status: int = 0
         if private_key and isinstance(private_key, dict):
             self.private_key = CoseKey.from_dict(private_key)
         
         self.signed :dict = {}
+        self.key_label = key_label
+        self.user_pin = user_pin
+        self.lib_path = lib_path
+        self.slot_id = slot_id
+        self.hsm = hsm
 
     def new(
         self,
@@ -57,7 +62,7 @@ class MdocCborIssuer:
                             ]
                             for ns, dgst in msoi.disclosure_map.items()
                         },
-                        "issuerAuth": mso.encode(hsm=True,key_label="brainppol2", user_pin="1234", lib_path="/etc/utimaco/libcs2_pkcs11.so",slot_id=3)
+                        "issuerAuth": mso.encode(hsm=self.hsm,key_label=self.key_label, user_pin=self.user_pin, lib_path=self.lib_path,slot_id=self.slot_id)
                     },
                     'deviceSigned': {
                         # TODO
