@@ -36,7 +36,6 @@ class MsoIssuer(MsoX509Fabric):
     def __init__(
         self,
         data: dict,
-        private_key: Union[dict, CoseKey],
         cert_path: str,
         key_label : str,
         user_pin : str,
@@ -45,6 +44,7 @@ class MsoIssuer(MsoX509Fabric):
         kid: str,
         alg: str,
         hsm : bool = False,
+        private_key: Union[dict, CoseKey] = None,
         digest_alg: str = settings.PYMDOC_HASHALG
     ):
 
