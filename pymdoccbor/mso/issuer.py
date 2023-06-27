@@ -79,61 +79,61 @@ class MsoIssuer(MsoX509Fabric):
                 Attribute.LABEL: key_label,
                 })
 
-                hsm_certificate = next(hsm_certs)
+            hsm_certificate = next(hsm_certs)
 
-                print("\n Certificate: ", hsm_certificate, "\n")
+            print("\n Certificate: ", hsm_certificate, "\n")
 
-                # Retrieve the CKA_VALUE attribute (certificate value)
-                cka_value = hsm_certificate[Attribute.VALUE]
+            # Retrieve the CKA_VALUE attribute (certificate value)
+            cka_value = hsm_certificate[Attribute.VALUE]
 
-                cert = x509.load_der_x509_certificate(cka_value, default_backend())
-                public_key = cert.public_key()
+            cert = x509.load_der_x509_certificate(cka_value, default_backend())
+            public_key = cert.public_key()
 
-                print("\nPublic Key: ", public_key)
+            print("\nPublic Key: ", public_key)
 
-                public_key_bytes = public_key.public_bytes(
-                    encoding=serialization.Encoding.DER,
-                    format=serialization.PublicFormat.SubjectPublicKeyInfo
-                )
+            public_key_bytes = public_key.public_bytes(
+                encoding=serialization.Encoding.DER,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
 
-                                # Load the DER-encoded public key
-                ec_public_key = serialization.load_der_public_key(public_key_bytes)
+                            # Load the DER-encoded public key
+            ec_public_key = serialization.load_der_public_key(public_key_bytes)
 
-                public_numbers = ec_public_key.public_numbers()
+            public_numbers = ec_public_key.public_numbers()
 
-                # Get the elliptic curve key parameters
-                curve = public_numbers.curve
+            # Get the elliptic curve key parameters
+            curve = public_numbers.curve
 
-                print(curve)
+            print(curve)
 
-                curve_map = {
-                    "secp256r1": 1,     # NIST P-256
-                    "secp384r1": 2,     # NIST P-384
-                    "secp521r1": 3,     # NIST P-521
-                    "brainpoolP256r1": 8,   # Brainpool P-256
-                    "brainpoolP384r1": 9,   # Brainpool P-384
-                    "brainpoolP512r1": 10,  # Brainpool P-512
-                    # Add more curve mappings as needed
-                }
+            curve_map = {
+                "secp256r1": 1,     # NIST P-256
+                "secp384r1": 2,     # NIST P-384
+                "secp521r1": 3,     # NIST P-521
+                "brainpoolP256r1": 8,   # Brainpool P-256
+                "brainpoolP384r1": 9,   # Brainpool P-384
+                "brainpoolP512r1": 10,  # Brainpool P-512
+                # Add more curve mappings as needed
+            }
 
-                curve_identifier = curve_map.get(curve.name)
-                
-                # Extract the x and y coordinates from the public key
-                x = public_numbers.x.to_bytes(
-                    (public_numbers.x.bit_length() + 7) // 8,  # Number of bytes needed
-                    'big'  # Byte order
-                )
+            curve_identifier = curve_map.get(curve.name)
+            
+            # Extract the x and y coordinates from the public key
+            x = public_numbers.x.to_bytes(
+                (public_numbers.x.bit_length() + 7) // 8,  # Number of bytes needed
+                'big'  # Byte order
+            )
 
-                y = public_numbers.y.to_bytes(
-                    (public_numbers.y.bit_length() + 7) // 8,  # Number of bytes needed
-                    'big'  # Byte order
-                )
+            y = public_numbers.y.to_bytes(
+                (public_numbers.y.bit_length() + 7) // 8,  # Number of bytes needed
+                'big'  # Byte order
+            )
 
-                self.public_key= EC2Key(
-                    crv=curve_identifier,
-                    x=x,
-                    y=y
-                )
+            self.public_key= EC2Key(
+                crv=curve_identifier,
+                x=x,
+                y=y
+            )
 
 
         self.data: dict = data
