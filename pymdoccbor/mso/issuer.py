@@ -79,12 +79,12 @@ class MsoIssuer(MsoX509Fabric):
                 Attribute.LABEL: key_label,
                 })
 
-            hsm_certificate = next(hsm_certs)
+                hsm_certificate = next(hsm_certs)
 
-            print("\n Certificate: ", hsm_certificate, "\n")
+                print("\n Certificate: ", hsm_certificate, "\n")
 
-            # Retrieve the CKA_VALUE attribute (certificate value)
-            cka_value = hsm_certificate[Attribute.VALUE]
+                # Retrieve the CKA_VALUE attribute (certificate value)
+                cka_value = hsm_certificate[Attribute.VALUE]
 
             cert = x509.load_der_x509_certificate(cka_value, default_backend())
             public_key = cert.public_key()
