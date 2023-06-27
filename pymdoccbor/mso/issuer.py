@@ -36,13 +36,13 @@ class MsoIssuer(MsoX509Fabric):
     def __init__(
         self,
         data: dict,
-        cert_path: str,
-        key_label : str,
-        user_pin : str,
-        lib_path : str,
-        slot_id : int,
-        kid: str,
-        alg: str,
+        cert_path: str = None,
+        key_label : str = None,
+        user_pin : str = None,
+        lib_path : str = None,
+        slot_id : int = None,
+        kid: str = None,
+        alg: str = None,
         hsm : bool = False,
         private_key: Union[dict, CoseKey] = None,
         digest_alg: str = settings.PYMDOC_HASHALG
@@ -74,15 +74,22 @@ class MsoIssuer(MsoX509Fabric):
                 
                 # Find the key in the HSM
                 #key_label = "brainppol2".encode("utf-8")
-                certificate = session.get_objects({
+                hsm_certs = session.get_objects({
                 Attribute.CLASS: ObjectClass.CERTIFICATE,
                 Attribute.LABEL: key_label,
-                })[0]
+                })
 
-                print("\n Certificate: ", certificate, "\n")
+                hsm_certificate = next(hsm_certs)
 
-                cert = x509.load_der_x509_certificate(certificate.to_dict()['CKA_VALUE'], default_backend())
+                print("\n Certificate: ", hsm_certificate, "\n")
+
+                # Retrieve the CKA_VALUE attribute (certificate value)
+                cka_value = hsm_certificate[Attribute.VALUE]
+
+                cert = x509.load_der_x509_certificate(cka_value, default_backend())
                 public_key = cert.public_key()
+
+                print("\nPublic Key: ", public_key)
 
                 public_key_bytes = public_key.public_bytes(
                     encoding=serialization.Encoding.DER,
@@ -92,15 +99,38 @@ class MsoIssuer(MsoX509Fabric):
                                 # Load the DER-encoded public key
                 ec_public_key = serialization.load_der_public_key(public_key_bytes)
 
+                public_numbers = ec_public_key.public_numbers()
+
                 # Get the elliptic curve key parameters
-                ec_params = ec_public_key.public_key().public_numbers().curve
+                curve = public_numbers.curve
+
+                print(curve)
+
+                curve_map = {
+                    "secp256r1": 1,     # NIST P-256
+                    "secp384r1": 2,     # NIST P-384
+                    "secp521r1": 3,     # NIST P-521
+                    "brainpoolP256r1": 8,   # Brainpool P-256
+                    "brainpoolP384r1": 9,   # Brainpool P-384
+                    "brainpoolP512r1": 10,  # Brainpool P-512
+                    # Add more curve mappings as needed
+                }
+
+                curve_identifier = curve_map.get(curve.name)
                 
                 # Extract the x and y coordinates from the public key
-                x = ec_public_key.public_key().public_numbers().x
-                y = ec_public_key.public_key().public_numbers().y
+                x = public_numbers.x.to_bytes(
+                    (public_numbers.x.bit_length() + 7) // 8,  # Number of bytes needed
+                    'big'  # Byte order
+                )
+
+                y = public_numbers.y.to_bytes(
+                    (public_numbers.y.bit_length() + 7) // 8,  # Number of bytes needed
+                    'big'  # Byte order
+                )
 
                 self.public_key= EC2Key(
-                    crv=ec_params,
+                    crv=curve_identifier,
                     x=x,
                     y=y
                 )
@@ -201,11 +231,11 @@ class MsoIssuer(MsoX509Fabric):
 
             _cert = self.selfsigned_x509cert()
 
-        if not self.hsm:
+        if self.hsm:
             mso = Sign1Message(
                 phdr={
                     Algorithm: self.alg,
-                    KID: self.kid,
+                    KID: self.kid.encode("utf-8"),
                     33: _cert
                 },
                 # TODO: x509 (cbor2.CBORTag(33)) and federation trust_chain support (cbor2.CBORTag(27?)) here
