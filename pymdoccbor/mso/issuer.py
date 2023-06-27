@@ -74,14 +74,14 @@ class MsoIssuer(MsoX509Fabric):
                 
                 # Find the key in the HSM
                 #key_label = "brainppol2".encode("utf-8")
-                certificates = session.get_objects({
+                certificate = session.get_objects({
                 Attribute.CLASS: ObjectClass.CERTIFICATE,
                 Attribute.LABEL: key_label,
                 })[0]
 
-                print("\n Certificate: ", certificates[0], "\n")
+                print("\n Certificate: ", certificate, "\n")
 
-                cert = x509.load_der_x509_certificate(certificates[0].to_dict()['CKA_VALUE'], default_backend())
+                cert = x509.load_der_x509_certificate(certificate.to_dict()['CKA_VALUE'], default_backend())
                 public_key = cert.public_key()
 
                 public_key_bytes = public_key.public_bytes(
