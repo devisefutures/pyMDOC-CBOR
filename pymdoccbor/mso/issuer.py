@@ -9,6 +9,11 @@ from pycose.keys import CoseKey, EC2Key
 from pycose.messages import Sign1Message
 
 from typing import Union
+import pkcs11
+from pkcs11.constants import ObjectClass
+from pkcs11 import Attribute 
+
+
 
 from pymdoccbor.exceptions import (
     MsoPrivateKeyRequired
@@ -18,6 +23,8 @@ from pymdoccbor.x509 import MsoX509Fabric
 from pymdoccbor.tools import shuffle_dict
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+
 
 
 
@@ -31,31 +38,86 @@ class MsoIssuer(MsoX509Fabric):
         data: dict,
         private_key: Union[dict, CoseKey],
         cert_path: str,
+        key_label : str,
+        user_pin : str,
+        lib_path : str,
+        slot_id : int,
+        kid: str,
+        alg: str,
+        hsm : bool = False,
         digest_alg: str = settings.PYMDOC_HASHALG
     ):
 
-        if private_key and isinstance(private_key, dict):
-            self.private_key = CoseKey.from_dict(private_key)
-            if not self.private_key.kid:
-                self.private_key.kid = str(uuid.uuid4())
-        elif private_key and isinstance(private_key, CoseKey):
-            self.private_key = private_key
-        else:
-            raise MsoPrivateKeyRequired(
-                "MSO Writer requires a valid private key"
-            )
+        if not hsm:
+            if private_key and isinstance(private_key, dict):
+                self.private_key = CoseKey.from_dict(private_key)
+                if not self.private_key.kid:
+                    self.private_key.kid = str(uuid.uuid4())
+            elif private_key and isinstance(private_key, CoseKey):
+                self.private_key = private_key
+            else:
+                raise MsoPrivateKeyRequired(
+                    "MSO Writer requires a valid private key"
+                )
 
-        self.public_key = EC2Key(
-            crv=self.private_key.crv,
-            x=self.private_key.x,
-            y=self.private_key.y
-        )
+            self.public_key = EC2Key(
+                crv=self.private_key.crv,
+                x=self.private_key.x,
+                y=self.private_key.y
+            )
+        else:
+            lib = pkcs11.lib(lib_path)
+            token = lib.get_slots()[slot_id].get_token()
+
+                # Open a session on our token
+            with token.open(user_pin=user_pin) as session:
+                
+                # Find the key in the HSM
+                #key_label = "brainppol2".encode("utf-8")
+                certificates = session.get_objects({
+                Attribute.CLASS: ObjectClass.CERTIFICATE,
+                Attribute.LABEL: key_label,
+                })[0]
+
+                print("\n Certificate: ", certificates[0], "\n")
+
+                cert = x509.load_der_x509_certificate(certificates[0].to_dict()['CKA_VALUE'], default_backend())
+                public_key = cert.public_key()
+
+                public_key_bytes = public_key.public_bytes(
+                    encoding=serialization.Encoding.DER,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                )
+
+                                # Load the DER-encoded public key
+                ec_public_key = serialization.load_der_public_key(public_key_bytes)
+
+                # Get the elliptic curve key parameters
+                ec_params = ec_public_key.public_key().public_numbers().curve
+                
+                # Extract the x and y coordinates from the public key
+                x = ec_public_key.public_key().public_numbers().x
+                y = ec_public_key.public_key().public_numbers().y
+
+                self.public_key= EC2Key(
+                    crv=ec_params,
+                    x=x,
+                    y=y
+                )
+
 
         self.data: dict = data
         self.hash_map: dict = {}
         self.cert_path=cert_path
         self.disclosure_map: dict = {}
         self.digest_alg: str = digest_alg
+        self.key_label = key_label
+        self.user_pin = user_pin
+        self.lib_path = lib_path
+        self.slot_id = slot_id
+        self.hsm = hsm
+        self.alg = alg
+        self.kid = kid
 
         hashfunc = getattr(
             hashlib,
@@ -100,7 +162,7 @@ class MsoIssuer(MsoX509Fabric):
         doctype: str = None
     ) -> Sign1Message:
         """
-            sign a mso and returns it
+            sign a mso and returns itprivate_key
         """
         utcnow = datetime.datetime.utcnow()
         if settings.PYMDOC_EXP_DELTA_HOURS:
@@ -139,18 +201,36 @@ class MsoIssuer(MsoX509Fabric):
 
             _cert = self.selfsigned_x509cert()
 
-        
-        mso = Sign1Message(
-            phdr={
-                Algorithm: self.private_key.alg,
-                KID: self.private_key.kid,
-                33: _cert
-            },
-            # TODO: x509 (cbor2.CBORTag(33)) and federation trust_chain support (cbor2.CBORTag(27?)) here
-            # 33 means x509chain standing to rfc9360
-            # in both protected and unprotected for interop purpose .. for now.
-            uhdr={33: _cert},
-            payload=cbor2.dumps(payload)
-        )
-        mso.key = self.private_key
+        if not self.hsm:
+            mso = Sign1Message(
+                phdr={
+                    Algorithm: self.alg,
+                    KID: self.kid,
+                    33: _cert
+                },
+                # TODO: x509 (cbor2.CBORTag(33)) and federation trust_chain support (cbor2.CBORTag(27?)) here
+                # 33 means x509chain standing to rfc9360
+                # in both protected and unprotected for interop purpose .. for now.
+                uhdr={33: _cert},
+                payload=cbor2.dumps(payload)
+            )
+
+        else:
+
+            mso = Sign1Message(
+                phdr={
+                    Algorithm: self.private_key.alg,
+                    KID: self.private_key.kid,
+                    33: _cert
+                },
+                # TODO: x509 (cbor2.CBORTag(33)) and federation trust_chain support (cbor2.CBORTag(27?)) here
+                # 33 means x509chain standing to rfc9360
+                # in both protected and unprotected for interop purpose .. for now.
+                uhdr={33: _cert},
+                payload=cbor2.dumps(payload)
+            )
+
+            mso.key = self.private_key
+
+
         return mso

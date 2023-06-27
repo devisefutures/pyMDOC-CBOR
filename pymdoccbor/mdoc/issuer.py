@@ -12,7 +12,7 @@ logger = logging.getLogger('pymdoccbor')
 
 class MdocCborIssuer:
 
-    def __init__(self,key_label :str = None, user_pin :str = None, lib_path :str = None, slot_id :int = None, hsm : bool =False, private_key: Union[dict, CoseKey] = {}):
+    def __init__(self,key_label :str = None, user_pin :str = None, lib_path :str = None, slot_id :int = None, hsm : bool =False, alg: str = None, kid: str = None, private_key: Union[dict, CoseKey] = {}):
         self.version: str = '1.0'
         self.status: int = 0
         if private_key and isinstance(private_key, dict):
@@ -24,6 +24,8 @@ class MdocCborIssuer:
         self.lib_path = lib_path
         self.slot_id = slot_id
         self.hsm = hsm
+        self.alg = alg
+        self.kid = kid
 
     def new(
         self,
@@ -40,11 +42,25 @@ class MdocCborIssuer:
         else:
             devicekeyinfo: CoseKey = devicekeyinfo
 
-        msoi = MsoIssuer(
-            data=data,
-            private_key=self.private_key,
-            cert_path=cert_path
-        )
+        if self.hsm:
+            msoi = MsoIssuer(
+                data=data,
+                cert_path=cert_path,
+                hsm=self.hsm,
+                key_label=self.key_label,
+                user_pin=self.user_pin,
+                lib_path=self.lib_path,
+                slot_id=self.slot_id,
+                alg=self.alg,
+                kid=self.kid
+            )
+            
+        else:
+            msoi = MsoIssuer(
+                data=data,
+                private_key=self.private_key,
+                cert_path=cert_path
+            )
 
         mso = msoi.sign()
 
