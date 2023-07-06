@@ -7,6 +7,9 @@ from typing import Union
 
 from pymdoccbor.mso.issuer import MsoIssuer
 
+from cbor_diag import *
+
+
 logger = logging.getLogger('pymdoccbor')
 
 
@@ -30,8 +33,8 @@ class MdocCborIssuer:
     def new(
         self,
         data: dict,
-        devicekeyinfo: Union[dict, CoseKey],
         doctype: str,
+        devicekeyinfo: Union[dict, CoseKey] = None,
         cert_path: str = None
     ):
         """
@@ -62,7 +65,9 @@ class MdocCborIssuer:
                 cert_path=cert_path
             )
 
-        mso = msoi.sign()
+        mso = msoi.sign(doctype=doctype)
+
+        mso_cbor = mso.encode(tag=False,hsm=self.hsm,key_label=self.key_label, user_pin=self.user_pin, lib_path=self.lib_path,slot_id=self.slot_id)
 
         # TODO: for now just a single document, it would be trivial having
         # also multiple but for now I don't have use cases for this
@@ -74,11 +79,11 @@ class MdocCborIssuer:
                     'issuerSigned': {
                         "nameSpaces": {
                             ns: [
-                                cbor2.CBORTag(24, value={k: v}) for k, v in dgst.items()
+                                cbor2.CBORTag(24, value=cbor2.dumps(v)) for k, v in dgst.items()
                             ]
                             for ns, dgst in msoi.disclosure_map.items()
                         },
-                        "issuerAuth": mso.encode(hsm=self.hsm,key_label=self.key_label, user_pin=self.user_pin, lib_path=self.lib_path,slot_id=self.slot_id)
+                        "issuerAuth": mso_cbor
                     },
                     'deviceSigned': {
                         # TODO
@@ -87,6 +92,9 @@ class MdocCborIssuer:
             ],
             'status': self.status
         }
+
+    
+        print("mso diganostic notation: \n", cbor2diag(mso_cbor))
         
         self.signed = res
         return self.signed

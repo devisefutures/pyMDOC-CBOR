@@ -25,6 +25,8 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
+from cbor_diag import *
+
 
 
 
@@ -70,18 +72,24 @@ class MsoIssuer(MsoX509Fabric):
             token = lib.get_slots()[slot_id].get_token()
 
                 # Open a session on our token
+            
             with token.open(user_pin=user_pin) as session:
-                
-                # Find the key in the HSM
-                #key_label = "brainppol2".encode("utf-8")
-                hsm_certs = session.get_objects({
-                Attribute.CLASS: ObjectClass.CERTIFICATE,
-                Attribute.LABEL: key_label,
-                })
 
-                hsm_certificate = next(hsm_certs)
+                try:
+                    # Find the key in the HSM
+                    #key_label = "brainppol2".encode("utf-8")
+                    hsm_certs = session.get_objects({
+                    Attribute.CLASS: ObjectClass.CERTIFICATE,
+                    Attribute.LABEL: key_label,
+                    })
 
-                print("\n Certificate: ", hsm_certificate, "\n")
+                    hsm_certificate = next(hsm_certs)
+                except pkcs11.exceptions.SessionHandleInvalid as e:
+                    print(e)
+                    print(type(e).__name__)
+
+
+                #print("\n Certificate: ", hsm_certificate, "\n")
 
                 # Retrieve the CKA_VALUE attribute (certificate value)
                 cka_value = hsm_certificate[Attribute.VALUE]
@@ -89,14 +97,14 @@ class MsoIssuer(MsoX509Fabric):
             cert = x509.load_der_x509_certificate(cka_value, default_backend())
             public_key = cert.public_key()
 
-            print("\nPublic Key: ", public_key)
+            #print("\nPublic Key: ", public_key)
 
             public_key_bytes = public_key.public_bytes(
                 encoding=serialization.Encoding.DER,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo
             )
 
-                            # Load the DER-encoded public key
+            # Load the DER-encoded public key
             ec_public_key = serialization.load_der_public_key(public_key_bytes)
 
             public_numbers = ec_public_key.public_numbers()
@@ -135,6 +143,15 @@ class MsoIssuer(MsoX509Fabric):
                 y=y
             )
 
+            self.public_key2 = {
+                1: 2,
+                -1: curve_identifier,
+                -2: cbor2.dumps(x),
+                -3: cbor2.dumps(y)
+            }
+
+            print("Public key: ", cbor2diag(self.public_key.encode()))
+
 
         self.data: dict = data
         self.hash_map: dict = {}
@@ -161,6 +178,13 @@ class MsoIssuer(MsoX509Fabric):
             for k, v in shuffle_dict(values).items():
 
                 _rnd_salt = secrets.token_bytes(settings.DIGEST_SALT_LENGTH)
+
+
+                if k == "birth_date":
+                    tag = 1004
+                    v = cbor2.CBORTag(1004,value=v)
+                else:
+                    tag = 24
 
                 self.disclosure_map[ns][digest_cnt] = {
                     'digestID': digest_cnt,
@@ -203,19 +227,27 @@ class MsoIssuer(MsoX509Fabric):
             # five years
             exp = utcnow + datetime.timedelta(hours=(24 * 365) * 5)
 
+        
+            alg_map = {
+                "ES256":"SHA-256",
+                "ES384":"SHA-384",
+                "ES512":"SHA-512"
+            }
+        
         payload = {
+            'docType': doctype or list(self.hash_map)[0],
             'version': '1.0',
-            'digestAlgorithm': settings.HASHALG_MAP[settings.PYMDOC_HASHALG],
+            'validityInfo': {
+                'signed': cbor2.CBORTag(0, self.format_datetime_repr(utcnow)),
+                'validFrom': cbor2.CBORTag(0, self.format_datetime_repr(valid_from or utcnow)),
+                'validUntil': cbor2.CBORTag(0, self.format_datetime_repr(exp))
+            },
             'valueDigests': self.hash_map,
             'deviceKeyInfo': {
-                'deviceKey': device_key
+                'deviceKey': self.public_key.encode(),
+
             },
-            'docType': doctype or list(self.hash_map)[0],
-            'validityInfo': {
-                'signed': cbor2.dumps(cbor2.CBORTag(0, self.format_datetime_repr(utcnow))),
-                'validFrom': cbor2.dumps(cbor2.CBORTag(0, self.format_datetime_repr(valid_from or utcnow))),
-                'validUntil': cbor2.dumps(cbor2.CBORTag(0, self.format_datetime_repr(exp)))
-            }
+            'digestAlgorithm': alg_map.get(self.alg),
         }
 
         if(self.cert_path):
@@ -231,36 +263,38 @@ class MsoIssuer(MsoX509Fabric):
 
             _cert = self.selfsigned_x509cert()
 
+
         if self.hsm:
+            print("payload diganostic notation: \n", cbor2diag(cbor2.dumps(cbor2.CBORTag(24,cbor2.dumps(payload)))))
+
+            
             mso = Sign1Message(
                 phdr={
                     Algorithm: self.alg,
-                    KID: self.kid.encode("utf-8"),
-                    33: _cert
+                    #33: _cert
                 },
                 # TODO: x509 (cbor2.CBORTag(33)) and federation trust_chain support (cbor2.CBORTag(27?)) here
                 # 33 means x509chain standing to rfc9360
                 # in both protected and unprotected for interop purpose .. for now.
                 uhdr={33: _cert},
-                payload=cbor2.dumps(payload)
+                payload=cbor2.dumps(cbor2.CBORTag(24,cbor2.dumps(payload))),
             )
+
 
         else:
 
             mso = Sign1Message(
                 phdr={
                     Algorithm: self.private_key.alg,
-                    KID: self.private_key.kid,
-                    33: _cert
+                    #KID: self.private_key.kid,
+                    #33: _cert
                 },
                 # TODO: x509 (cbor2.CBORTag(33)) and federation trust_chain support (cbor2.CBORTag(27?)) here
                 # 33 means x509chain standing to rfc9360
                 # in both protected and unprotected for interop purpose .. for now.
                 uhdr={33: _cert},
-                payload=cbor2.dumps(payload)
+                payload=cbor2.dumps(cbor2.CBORTag(24,cbor2.dumps(payload)))
             )
 
             mso.key = self.private_key
-
-
         return mso
