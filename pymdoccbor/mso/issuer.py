@@ -112,7 +112,7 @@ class MsoIssuer(MsoX509Fabric):
             # Get the elliptic curve key parameters
             curve = public_numbers.curve
 
-            print(curve)
+            #print(curve)
 
             curve_map = {
                 "secp256r1": 1,     # NIST P-256
@@ -150,7 +150,7 @@ class MsoIssuer(MsoX509Fabric):
                 -3: cbor2.dumps(y)
             }
 
-            print("Public key: ", cbor2diag(self.public_key.encode()))
+            #print("Public key: ", cbor2diag(self.public_key.encode()))
 
 
         self.data: dict = data
@@ -244,7 +244,7 @@ class MsoIssuer(MsoX509Fabric):
             },
             'valueDigests': self.hash_map,
             'deviceKeyInfo': {
-                'deviceKey': self.public_key.encode(),
+                'deviceKey': self.public_key2,
 
             },
             'digestAlgorithm': alg_map.get(self.alg),
@@ -265,7 +265,7 @@ class MsoIssuer(MsoX509Fabric):
 
 
         if self.hsm:
-            print("payload diganostic notation: \n", cbor2diag(cbor2.dumps(cbor2.CBORTag(24,cbor2.dumps(payload)))))
+            #print("payload diganostic notation: \n", cbor2diag(cbor2.dumps(cbor2.CBORTag(24,cbor2.dumps(payload)))))
 
             
             mso = Sign1Message(

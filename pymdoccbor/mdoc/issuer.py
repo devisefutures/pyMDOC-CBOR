@@ -83,18 +83,15 @@ class MdocCborIssuer:
                             ]
                             for ns, dgst in msoi.disclosure_map.items()
                         },
-                        "issuerAuth": mso_cbor
+                        "issuerAuth": [mso_cbor]
                     },
-                    'deviceSigned': {
-                        # TODO
-                    }
                 }
             ],
             'status': self.status
         }
 
     
-        print("mso diganostic notation: \n", cbor2diag(mso_cbor))
+        #print("mso diganostic notation: \n", cbor2diag(mso_cbor))
         
         self.signed = res
         return self.signed
