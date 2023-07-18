@@ -68,6 +68,15 @@ class MsoIssuer(MsoX509Fabric):
                 y=self.private_key.y
             )
 
+            self.public_key = {
+                    1: 2,
+                    -1: self.private_key.crv,
+                    -2: cbor2.dumps(x),
+                    -3: cbor2.dumps(y)
+                }
+
+            curve_identifier = curve_map.get(curve.name)
+
             
         else:
             lib = pkcs11.lib(lib_path)
@@ -139,18 +148,18 @@ class MsoIssuer(MsoX509Fabric):
                     'big'  # Byte order
                 )
 
-                #self.public_key= EC2Key(
-                #    crv=curve_identifier,
-                #    x=x,
-                #    y=y
-                #)
+                self.public_key= EC2Key(
+                    crv=curve_identifier,
+                    x=x,
+                    y=y
+                )
 
-                self.public_key = {
-                    1: 2,
-                    -1: curve_identifier,
-                    -2: cbor2.dumps(x),
-                    -3: cbor2.dumps(y)
-                }
+                #self.public_key = {
+                #    1: 2,
+                #    -1: curve_identifier,
+                #    -2: cbor2.dumps(x),
+                #    -3: cbor2.dumps(y)
+                #}
 
                 #print("Public key: ", cbor2diag(self.public_key.encode()))
 
