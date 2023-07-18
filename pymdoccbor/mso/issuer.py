@@ -67,6 +67,8 @@ class MsoIssuer(MsoX509Fabric):
                 x=self.private_key.x,
                 y=self.private_key.y
             )
+
+            
         else:
             lib = pkcs11.lib(lib_path)
             token = lib.get_slots()[slot_id].get_token()
@@ -244,7 +246,7 @@ class MsoIssuer(MsoX509Fabric):
             },
             'valueDigests': self.hash_map,
             'deviceKeyInfo': {
-                'deviceKey': self.public_key,
+                'deviceKey': self.public_key.encode(),
 
             },
             'digestAlgorithm': alg_map.get(self.alg),
