@@ -68,7 +68,7 @@ class MdocCborIssuer:
 
         mso = msoi.sign(doctype=doctype)
 
-        mso_cbor = mso.encode(tag=False,hsm=self.hsm,key_label=self.key_label, user_pin=self.user_pin, lib_path=self.lib_path,slot_id=self.slot_id)
+        mso_cbor = mso.encode(tag=False)
 
         # TODO: for now just a single document, it would be trivial having
         # also multiple but for now I don't have use cases for this
