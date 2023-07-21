@@ -61,22 +61,19 @@ class MsoIssuer(MsoX509Fabric):
                 raise MsoPrivateKeyRequired(
                     "MSO Writer requires a valid private key"
                 )
-
-            self.public_key = EC2Key(
-                crv=self.private_key.crv,
-                x=self.private_key.x,
-                y=self.private_key.y
-            )
+            
+            #self.public_key = EC2Key(
+            #    crv=self.private_key.crv,
+            #    x=self.private_key.x,
+            #    y=self.private_key.y
+            #)
 
             self.public_key = {
                     1: 2,
-                    -1: self.private_key.crv,
-                    -2: cbor2.dumps(x),
-                    -3: cbor2.dumps(y)
+                    -1: self.private_key.crv.identifier,
+                    -2: cbor2.dumps(self.private_key.x),
+                    -3: cbor2.dumps(self.private_key.y)
                 }
-
-            curve_identifier = curve_map.get(curve.name)
-
             
         else:
             lib = pkcs11.lib(lib_path)
@@ -148,18 +145,18 @@ class MsoIssuer(MsoX509Fabric):
                     'big'  # Byte order
                 )
 
-                self.public_key= EC2Key(
-                    crv=curve_identifier,
-                    x=x,
-                    y=y
-                )
+                #self.public_key= EC2Key(
+                #    crv=curve_identifier,
+                #    x=x,
+                #    y=y
+                #)
 
-                #self.public_key = {
-                #    1: 2,
-                #    -1: curve_identifier,
-                #    -2: cbor2.dumps(x),
-                #    -3: cbor2.dumps(y)
-                #}
+                self.public_key = {
+                    1: 2,
+                    -1: curve_identifier,
+                    -2: cbor2.dumps(x),
+                    -3: cbor2.dumps(y)
+                }
 
                 #print("Public key: ", cbor2diag(self.public_key.encode()))
 
@@ -177,10 +174,18 @@ class MsoIssuer(MsoX509Fabric):
         self.alg = alg
         self.kid = kid
 
+        alg_map = {
+                "ES256":"sha256",
+                "ES384":"sha384",
+                "ES512":"sha512"
+            }
+
         hashfunc = getattr(
             hashlib,
-            settings.HASHALG_MAP[settings.PYMDOC_HASHALG]
+            alg_map.get(self.alg)
         )
+
+        print("hashfunc: ", hashfunc )
 
         digest_cnt = 0
         for ns, values in data.items():
@@ -255,7 +260,7 @@ class MsoIssuer(MsoX509Fabric):
             },
             'valueDigests': self.hash_map,
             'deviceKeyInfo': {
-                'deviceKey': self.public_key.encode(),
+                'deviceKey': self.public_key,
 
             },
             'digestAlgorithm': alg_map.get(self.alg),
@@ -293,6 +298,8 @@ class MsoIssuer(MsoX509Fabric):
 
 
         else:
+            #print("payload diganostic notation: \n", cbor2diag(cbor2.dumps(cbor2.CBORTag(24,cbor2.dumps(payload)))))
+
 
             mso = Sign1Message(
                 phdr={
@@ -308,4 +315,6 @@ class MsoIssuer(MsoX509Fabric):
             )
 
             mso.key = self.private_key
+                       
+
         return mso

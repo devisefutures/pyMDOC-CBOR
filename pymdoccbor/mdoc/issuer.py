@@ -62,6 +62,7 @@ class MdocCborIssuer:
             msoi = MsoIssuer(
                 data=data,
                 private_key=self.private_key,
+                alg=self.alg,
                 cert_path=cert_path
             )
 
@@ -83,7 +84,7 @@ class MdocCborIssuer:
                             ]
                             for ns, dgst in msoi.disclosure_map.items()
                         },
-                        "issuerAuth": [mso_cbor]
+                        "issuerAuth": cbor2.decoder.loads(mso_cbor)
                     },
                 }
             ],
