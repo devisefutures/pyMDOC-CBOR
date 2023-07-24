@@ -185,7 +185,7 @@ class MsoIssuer(MsoX509Fabric):
             alg_map.get(self.alg)
         )
 
-        print("hashfunc: ", hashfunc )
+        #print("hashfunc: ", hashfunc )
 
         digest_cnt = 0
         for ns, values in data.items():
