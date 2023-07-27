@@ -9,9 +9,6 @@ from pycose.keys import CoseKey
 from pycose.messages import Sign1Message
 
 from typing import Union
-import pkcs11
-from pkcs11.constants import ObjectClass
-from pkcs11.util.ec import encode_ec_public_key
 
 
 from pymdoccbor.exceptions import MsoPrivateKeyRequired
@@ -31,6 +28,7 @@ class MsoIssuer(MsoX509Fabric):
     def __init__(
         self,
         data: dict,
+        validity: str,
         cert_path: str = None,
         key_label: str = None,
         user_pin: str = None,
@@ -52,114 +50,6 @@ class MsoIssuer(MsoX509Fabric):
             else:
                 raise MsoPrivateKeyRequired("MSO Writer requires a valid private key")
 
-            # self.public_key = EC2Key(
-            #    crv=self.private_key.crv,
-            #    x=self.private_key.x,
-            #    y=self.private_key.y
-            # )
-
-            self.public_key = {
-                1: 2,
-                -1: self.private_key.crv.identifier,
-                -2: cbor2.dumps(self.private_key.x),
-                -3: cbor2.dumps(self.private_key.y),
-            }
-
-        else:
-            lib = pkcs11.lib(lib_path)
-            token = lib.get_slots()[slot_id].get_token()
-
-            # Open a session on our token
-
-            with token.open(user_pin=user_pin) as session:
-                try:
-                    # Find the key in the HSM
-                    # key_label = "brainppol2".encode("utf-8")
-                    # hsm_certs = session.get_objects(
-                    #    {
-                    #        Attribute.CLASS: ObjectClass.CERTIFICATE,
-                    #        Attribute.LABEL: key_label,
-                    #    }
-                    # )
-
-                    # hsm_certificate = next(hsm_certs)
-                    public_key = session.get_key(
-                        object_class=ObjectClass.PUBLIC_KEY,
-                        id=key_label.encode("utf-8"),
-                    )
-                except pkcs11.exceptions.SessionHandleInvalid as e:
-                    print(e)
-                    print(type(e).__name__)
-
-                public_key_bytes = encode_ec_public_key(public_key)
-
-                public_key = serialization.load_der_public_key(public_key_bytes)
-
-                curve_name = public_key.curve.name
-
-                # print("\n Certificate: ", hsm_certificate, "\n")
-
-                # Retrieve the CKA_VALUE attribute (certificate value)
-                # cka_value = hsm_certificate[Attribute.VALUE]
-
-                # cert = x509.load_der_x509_certificate(cka_value, default_backend())
-                # public_key = cert.public_key()
-
-                # print("\nPublic Key: ", public_key)
-
-                # public_key_bytes = public_key.public_bytes(
-                #    encoding=serialization.Encoding.DER,
-                #    format=serialization.PublicFormat.SubjectPublicKeyInfo,
-                # )
-
-                # Load the DER-encoded public key
-                # ec_public_key = serialization.load_der_public_key(public_key_bytes)
-
-                # public_numbers = ec_public_key.public_numbers()
-
-                # Get the elliptic curve key parameters
-                # curve = public_numbers.curve
-
-                # print(curve)
-
-                curve_map = {
-                    "secp256r1": 1,  # NIST P-256
-                    "secp384r1": 2,  # NIST P-384
-                    "secp521r1": 3,  # NIST P-521
-                    "brainpoolP256r1": 8,  # Brainpool P-256
-                    "brainpoolP384r1": 9,  # Brainpool P-384
-                    "brainpoolP512r1": 10,  # Brainpool P-512
-                    # Add more curve mappings as needed
-                }
-
-                curve_identifier = curve_map.get(curve_name)
-
-                # Extract the x and y coordinates from the public key
-                x = public_key.public_numbers().x.to_bytes(
-                    (public_key.public_numbers().x.bit_length() + 7)
-                    // 8,  # Number of bytes needed
-                    "big",  # Byte order
-                )
-
-                y = public_key.public_numbers().y.to_bytes(
-                    (public_key.public_numbers().y.bit_length() + 7)
-                    // 8,  # Number of bytes needed
-                    "big",  # Byte order
-                )
-
-                # self.public_key= EC2Key(
-                #    crv=curve_identifier,
-                #    x=x,
-                #    y=y
-                # )
-
-                self.public_key = {
-                    1: 2,
-                    -1: curve_identifier,
-                    -2: cbor2.dumps(x),
-                    -3: cbor2.dumps(y),
-                }
-
         self.data: dict = data
         self.hash_map: dict = {}
         self.cert_path = cert_path
@@ -172,6 +62,7 @@ class MsoIssuer(MsoX509Fabric):
         self.hsm = hsm
         self.alg = alg
         self.kid = kid
+        self.validity = validity
 
         alg_map = {"ES256": "sha256", "ES384": "sha384", "ES512": "sha512"}
 
@@ -222,13 +113,17 @@ class MsoIssuer(MsoX509Fabric):
         sign a mso and returns itprivate_key
         """
         utcnow = datetime.datetime.utcnow()
+        valid_from = datetime.datetime.strptime(
+            self.validity["issuance_date"], "%Y-%m-%d"
+        )
         if settings.PYMDOC_EXP_DELTA_HOURS:
             exp = utcnow + datetime.timedelta(hours=settings.PYMDOC_EXP_DELTA_HOURS)
         else:
             # five years
-            exp = utcnow + datetime.timedelta(hours=(24 * 365) * 5)
+            exp = datetime.datetime.strptime(self.validity["expiry_date"], "%Y-%m-%d")
+            # exp = utcnow + datetime.timedelta(hours=(24 * 365) * 5)
 
-            alg_map = {"ES256": "SHA-256", "ES384": "SHA-384", "ES512": "SHA-512"}
+        alg_map = {"ES256": "SHA-256", "ES384": "SHA-384", "ES512": "SHA-512"}
 
         payload = {
             "docType": doctype or list(self.hash_map)[0],
@@ -242,7 +137,7 @@ class MsoIssuer(MsoX509Fabric):
             },
             "valueDigests": self.hash_map,
             "deviceKeyInfo": {
-                "deviceKey": self.public_key,
+                "deviceKey": device_key,
             },
             "digestAlgorithm": alg_map.get(self.alg),
         }
