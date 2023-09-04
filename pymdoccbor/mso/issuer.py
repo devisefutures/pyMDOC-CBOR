@@ -123,6 +123,9 @@ class MsoIssuer(MsoX509Fabric):
             exp = datetime.datetime.strptime(self.validity["expiry_date"], "%Y-%m-%d")
             # exp = utcnow + datetime.timedelta(hours=(24 * 365) * 5)
 
+        if utcnow > valid_from:
+            valid_from = utcnow
+
         alg_map = {"ES256": "SHA-256", "ES384": "SHA-384", "ES512": "SHA-512"}
 
         payload = {
