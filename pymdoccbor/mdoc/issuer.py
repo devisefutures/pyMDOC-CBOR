@@ -134,10 +134,7 @@ class MdocCborIssuer:
                     "docType": doctype,  # 'org.iso.18013.5.1.mDL'
                     "issuerSigned": {
                         "nameSpaces": {
-                            ns: [
-                                cbor2.CBORTag(24, value=cbor2.dumps(v))
-                                for k, v in dgst.items()
-                            ]
+                            ns: [v for k, v in dgst.items()]
                             for ns, dgst in msoi.disclosure_map.items()
                         },
                         "issuerAuth": cbor2.decoder.loads(mso_cbor),
@@ -156,10 +153,10 @@ class MdocCborIssuer:
         """
         returns bytes
         """
-        return cbor2.dumps(self.signed)
+        return cbor2.dumps(self.signed, canonical=True)
 
     def dumps(self):
         """
         returns AF binary repr
         """
-        return binascii.hexlify(cbor2.dumps(self.signed))
+        return binascii.hexlify(cbor2.dumps(self.signed, canonical=True))

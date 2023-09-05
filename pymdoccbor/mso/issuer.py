@@ -68,8 +68,6 @@ class MsoIssuer(MsoX509Fabric):
 
         hashfunc = getattr(hashlib, alg_map.get(self.alg))
 
-        # print("hashfunc: ", hashfunc )
-
         digest_cnt = 0
         for ns, values in data.items():
             self.disclosure_map[ns] = {}
@@ -78,24 +76,26 @@ class MsoIssuer(MsoX509Fabric):
                 _rnd_salt = secrets.token_bytes(settings.DIGEST_SALT_LENGTH)
 
                 if k == "birth_date" or k == "issuance_date" or k == "expiry_date":
-                    tag = 1004
                     v = cbor2.CBORTag(1004, value=v)
-                else:
-                    tag = 24
 
-                self.disclosure_map[ns][digest_cnt] = {
-                    "digestID": digest_cnt,
-                    "random": _rnd_salt,
-                    "elementIdentifier": k,
-                    "elementValue": v,
-                }
+                self.disclosure_map[ns][digest_cnt] = cbor2.dumps(
+                    cbor2.CBORTag(
+                        24,
+                        value=cbor2.dumps(
+                            {
+                                "digestID": digest_cnt,
+                                "random": _rnd_salt,
+                                "elementIdentifier": k,
+                                "elementValue": v,
+                            },
+                            canonical=True,
+                        ),
+                    ),
+                    canonical=True,
+                )
 
                 self.hash_map[ns][digest_cnt] = hashfunc(
-                    cbor2.dumps(
-                        cbor2.CBORTag(
-                            24, value=cbor2.dumps(self.disclosure_map[ns][digest_cnt])
-                        )
-                    )
+                    self.disclosure_map[ns][digest_cnt]
                 ).digest()
 
                 digest_cnt += 1
@@ -157,10 +157,7 @@ class MsoIssuer(MsoX509Fabric):
             _cert = self.selfsigned_x509cert()
 
         if self.hsm:
-            print(
-                "payload diganostic notation: \n",
-                cbor2diag(cbor2.dumps(cbor2.CBORTag(24, cbor2.dumps(payload)))),
-            )
+            # print("payload diganostic notation: \n",cbor2diag(cbor2.dumps(cbor2.CBORTag(24, cbor2.dumps(payload)))))
 
             mso = Sign1Message(
                 phdr={
@@ -171,7 +168,10 @@ class MsoIssuer(MsoX509Fabric):
                 # 33 means x509chain standing to rfc9360
                 # in both protected and unprotected for interop purpose .. for now.
                 uhdr={33: _cert},
-                payload=cbor2.dumps(cbor2.CBORTag(24, cbor2.dumps(payload))),
+                payload=cbor2.dumps(
+                    cbor2.CBORTag(24, cbor2.dumps(payload, canonical=True)),
+                    canonical=True,
+                ),
             )
 
         else:
@@ -187,7 +187,10 @@ class MsoIssuer(MsoX509Fabric):
                 # 33 means x509chain standing to rfc9360
                 # in both protected and unprotected for interop purpose .. for now.
                 uhdr={33: _cert},
-                payload=cbor2.dumps(cbor2.CBORTag(24, cbor2.dumps(payload))),
+                payload=cbor2.dumps(
+                    cbor2.CBORTag(24, cbor2.dumps(payload, canonical=True)),
+                    canonical=True,
+                ),
             )
 
             mso.key = self.private_key
