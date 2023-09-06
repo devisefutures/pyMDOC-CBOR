@@ -78,24 +78,21 @@ class MsoIssuer(MsoX509Fabric):
                 if k == "birth_date" or k == "issuance_date" or k == "expiry_date":
                     v = cbor2.CBORTag(1004, value=v)
 
-                self.disclosure_map[ns][digest_cnt] = cbor2.dumps(
-                    cbor2.CBORTag(
-                        24,
-                        value=cbor2.dumps(
-                            {
-                                "digestID": digest_cnt,
-                                "random": _rnd_salt,
-                                "elementIdentifier": k,
-                                "elementValue": v,
-                            },
-                            canonical=True,
-                        ),
+                self.disclosure_map[ns][digest_cnt] = cbor2.CBORTag(
+                    24,
+                    value=cbor2.dumps(
+                        {
+                            "digestID": digest_cnt,
+                            "random": _rnd_salt,
+                            "elementIdentifier": k,
+                            "elementValue": v,
+                        },
+                        canonical=True,
                     ),
-                    canonical=True,
                 )
 
                 self.hash_map[ns][digest_cnt] = hashfunc(
-                    self.disclosure_map[ns][digest_cnt]
+                    cbor2.dumps(self.disclosure_map[ns][digest_cnt], canonical=True)
                 ).digest()
 
                 digest_cnt += 1
