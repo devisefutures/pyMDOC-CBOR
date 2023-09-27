@@ -1,4 +1,4 @@
-# Modifications have been made to the original file (available at https://github.com/google/identity-credential)
+# Modifications have been made to the original file (available at https://github.com/IdentityPython/pyMDOC-CBOR)
 # All modifications Copyright (c) 2023 European Commission
 
 # All modifications licensed under the Apache License, Version 2.0 (the "License");
