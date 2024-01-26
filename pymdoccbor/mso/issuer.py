@@ -90,8 +90,18 @@ class MsoIssuer(MsoX509Fabric):
             for k, v in shuffle_dict(values).items():
                 _rnd_salt = secrets.token_bytes(settings.DIGEST_SALT_LENGTH)
 
-                if k == "birth_date" or k == "issuance_date" or k == "expiry_date":
-                    v = cbor2.CBORTag(1004, value=v)
+                _value_cbortag = settings.CBORTAGS_ATTR_MAP.get(k, None)
+
+                if _value_cbortag:
+                    v = cbor2.CBORTag(_value_cbortag, value=v)
+                    # print("\n-----\n K,V ", k, "\n", v)
+
+                if k == "driving_privileges":
+                    for item in v:
+                        for k2, v2 in item.items():
+                            _value_cbortag = settings.CBORTAGS_ATTR_MAP.get(k2, None)
+                            if _value_cbortag:
+                                item[k2] = cbor2.CBORTag(_value_cbortag, value=v2)
 
                 self.disclosure_map[ns][digest_cnt] = cbor2.CBORTag(
                     24,
