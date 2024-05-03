@@ -39,4 +39,9 @@ X509_SAN_URL = os.getenv(
     "X509_SAN_URL", "https://credential-issuer.oidc-federation.online"
 )
 
-CBORTAGS_ATTR_MAP = {"birth_date": 1004, "expiry_date": 1004, "issue_date": 1004}
+CBORTAGS_ATTR_MAP = {
+    "birth_date": 1004,
+    "expiry_date": 1004,
+    "issue_date": 1004,
+    "issuance_date": 1004,
+}
